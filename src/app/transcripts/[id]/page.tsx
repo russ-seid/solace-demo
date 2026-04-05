@@ -193,8 +193,8 @@ export default function TranscriptDetailPage() {
     : "unreviewed";
 
   const statusConfig = {
-    unreviewed: { label: "Unreviewed", bg: "#ededed", color: "#525252" },
-    "in-progress": { label: "In Progress", bg: "#F5E5C0", color: "#7A5A20" },
+    unreviewed: { label: "Unreviewed", bg: "#f1e1e2", color: "#a92127" },
+    "in-progress": { label: "In Progress", bg: "#e9cc95", color: "#101010" },
     reviewed: { label: "Reviewed", bg: "#d4e2dd", color: "#285e50" },
   };
 
@@ -267,12 +267,6 @@ export default function TranscriptDetailPage() {
                 <PersonOutlinedIcon sx={{ fontSize: 15, color: "#aaa" }} />
                 <span>{data.patientName}</span>
               </div>
-              <span
-                className="inline-flex items-center px-2 py-0.5 rounded-full text-[12px] font-bold whitespace-nowrap"
-                style={{ backgroundColor: statusConfig[status].bg, color: statusConfig[status].color }}
-              >
-                {statusConfig[status].label}
-              </span>
               <button
                 onClick={() => setSummaryOpen((v) => !v)}
                 className="ml-auto flex items-center gap-1 text-[12px] text-[#747474] hover:text-[#285e50] transition-colors cursor-pointer"
@@ -403,23 +397,38 @@ export default function TranscriptDetailPage() {
         <div className="w-[320px] shrink-0 self-start border border-[#e5e5e5] rounded-xl overflow-hidden">
 
           {/* Tasks header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-[#e5e5e5]">
-            <div className="flex items-center gap-2">
-              <ChecklistOutlinedIcon sx={{ fontSize: 18, color: "#285e50" }} />
-              <span className="text-[16px] font-bold text-[#232323]">Tasks</span>
-              {pendingCount > 0 && (
-                <span
-                  className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold"
-                  style={{ backgroundColor: "#f4f8f7", color: "#285e50" }}
-                >
-                  <AutoAwesomeOutlinedIcon sx={{ fontSize: 10 }} />
-                  AI suggested
-                </span>
-              )}
+          <div className="px-6 py-4 border-b border-[#e5e5e5]">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ChecklistOutlinedIcon sx={{ fontSize: 18, color: "#285e50" }} />
+                <span className="text-[16px] font-bold text-[#232323]">Tasks</span>
+              </div>
+              <span
+                className="inline-flex items-center px-2 py-0.5 rounded-full text-[12px] font-bold whitespace-nowrap"
+                style={{ backgroundColor: statusConfig[status].bg, color: statusConfig[status].color }}
+              >
+                {statusConfig[status].label}
+              </span>
             </div>
-            <span className="text-[12px] text-[#747474]">
-              {approved.size + completed.size + dismissed.size}/{totalTasks}
-            </span>
+            {totalTasks > 0 && (pendingCount > 0 || approved.size > 0 || completed.size > 0) && (
+              <div className="flex items-center gap-2 mt-1 pl-7">
+                {pendingCount > 0 && (
+                  <span
+                    className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold"
+                    style={{ backgroundColor: "#f4f8f7", color: "#285e50" }}
+                  >
+                    <AutoAwesomeOutlinedIcon sx={{ fontSize: 10 }} />
+                    {pendingCount} AI suggested
+                  </span>
+                )}
+                {approved.size > 0 && (
+                  <span className="text-[12px] text-[#747474]">{approved.size} in progress</span>
+                )}
+                {completed.size > 0 && (
+                  <span className="text-[12px] text-[#747474]">{completed.size} completed</span>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Task list */}
