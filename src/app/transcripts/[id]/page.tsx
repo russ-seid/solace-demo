@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import TopNav from "@/components/TopNav";
@@ -15,6 +15,7 @@ import AutoAwesomeOutlinedIcon from "@mui/icons-material/AutoAwesomeOutlined";
 import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
 import ChecklistOutlinedIcon from "@mui/icons-material/ChecklistOutlined";
 import { transcriptDataMap } from "../transcriptData";
+import { getSavedState, saveState } from "../transcriptStore";
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -157,12 +158,17 @@ export default function TranscriptDetailPage() {
   const taskRefs = useRef<(HTMLDivElement | null)[]>([]);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
 
-  const [approved, setApproved] = useState<Set<number>>(new Set(data?.initialApproved ?? []));
-  const [completed, setCompleted] = useState<Set<number>>(new Set(data?.initialCompleted ?? []));
-  const [dismissed, setDismissed] = useState<Set<number>>(new Set(data?.initialDismissed ?? []));
+  const saved = getSavedState(id);
+  const [approved, setApproved] = useState<Set<number>>(new Set(saved?.approved ?? data?.initialApproved ?? []));
+  const [completed, setCompleted] = useState<Set<number>>(new Set(saved?.completed ?? data?.initialCompleted ?? []));
+  const [dismissed, setDismissed] = useState<Set<number>>(new Set(saved?.dismissed ?? data?.initialDismissed ?? []));
 
   const [searchQuery, setSearchQuery] = useState("");
   const [toast, setToast] = useState(false);
+
+  useEffect(() => {
+    saveState(id, { approved: [...approved], completed: [...completed], dismissed: [...dismissed] });
+  }, [id, approved, completed, dismissed]);
 
   function showToast() {
     setToast(true);

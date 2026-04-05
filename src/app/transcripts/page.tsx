@@ -1,5 +1,8 @@
 "use client";
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import { getSavedState, computeStatus } from "./transcriptStore";
+import { transcriptDataMap } from "./transcriptData";
 import TopNavShared from "@/components/TopNav";
 import PhoneIcon from "@mui/icons-material/LocalPhoneOutlined";
 import VideoIcon from "@mui/icons-material/VideocamOutlined";
@@ -170,9 +173,9 @@ function TranscriptRow({ transcript }: { transcript: Transcript }) {
 
       {/* Status */}
       <div className="w-[200px] shrink-0 px-6 py-6 flex flex-col gap-1">
-        <StatusPill status={transcript.status} />
+        <StatusPill status={getLiveStatus(transcript.id).status} />
         <span className="text-[13px] font-normal text-[#747474] leading-[1.5] whitespace-nowrap">
-          {transcript.taskLabel}
+          {getLiveStatus(transcript.id).taskLabel}
         </span>
       </div>
 
@@ -249,7 +252,26 @@ function PageHeader() {
   );
 }
 
+function getLiveStatus(id: string): { status: Status; taskLabel: string } {
+  const saved = getSavedState(id);
+  const data = transcriptDataMap[id];
+  if (!saved || !data) return { status: data ? (data.suggestedActions.length === 0 ? "reviewed" : "unreviewed") : "unreviewed", taskLabel: transcriptGroups.flatMap(g => g.transcripts).find(t => t.id === id)?.taskLabel ?? "" };
+  const totalTasks = data.suggestedActions.length;
+  const status = computeStatus(totalTasks, saved.approved, saved.completed, saved.dismissed);
+  const pendingCount = totalTasks - saved.approved.length - saved.completed.length - saved.dismissed.length;
+  const parts = [
+    pendingCount > 0 ? `${pendingCount} suggested` : null,
+    saved.approved.length > 0 ? `${saved.approved.length} in progress` : null,
+    saved.completed.length > 0 ? `${saved.completed.length} completed` : null,
+  ].filter(Boolean);
+  const taskLabel = parts.length > 0 ? parts.join(" · ") : "0 tasks";
+  return { status, taskLabel };
+}
+
 export default function TranscriptsPage() {
+  const [, forceUpdate] = useState(0);
+  useEffect(() => { forceUpdate(n => n + 1); }, []);
+
   return (
     <div className="h-screen bg-white flex flex-col overflow-hidden">
       <TopNavShared />
