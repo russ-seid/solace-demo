@@ -41,12 +41,12 @@ const transcriptGroups: TranscriptGroup[] = [
         contactType: "phone",
         summaryTitle: "Prescription delay causing missed doses for blood pressure ...",
         summaryNote: "Missed medication due to pharmacy delay",
-        status: "in-progress",
-        taskLabel: "5 tasks in progress",
+        status: "unreviewed",
+        taskLabel: "5 tasks suggested",
       },
       {
         id: "2",
-        time: "8:00-8:30am",
+        time: "9:20-9:55am",
         patientName: "Olivia Wilson",
         patientId: "#1245",
         contactType: "video",
@@ -73,7 +73,7 @@ const transcriptGroups: TranscriptGroup[] = [
     transcripts: [
       {
         id: "4",
-        time: "8:00-8:30am",
+        time: "1:45-3:00pm",
         patientName: "Amanda Lee",
         patientId: "#8913",
         contactType: "video",
@@ -84,7 +84,7 @@ const transcriptGroups: TranscriptGroup[] = [
       },
       {
         id: "5",
-        time: "11:00-11:30am",
+        time: "11:25-11:55am",
         patientName: "James Anderson",
         patientId: "#4126",
         contactType: "phone",
@@ -251,28 +251,29 @@ function PageHeader() {
 
 export default function TranscriptsPage() {
   return (
-    <div className="min-h-screen bg-white">
+    <div className="h-screen bg-white flex flex-col overflow-hidden">
       <TopNavShared />
 
-      <div className="px-10">
+      {/* Page header — never scrolls */}
+      <div className="px-10 shrink-0">
         <PageHeader />
+      </div>
 
-        {/* Transcript list */}
-        <div>
-          {transcriptGroups.map((group) => (
-            <TranscriptGroupSection key={group.date} group={group} />
-          ))}
-        </div>
+      {/* Scrollable list */}
+      <div className="flex-1 overflow-y-auto px-10 min-h-0">
+        {transcriptGroups.map((group) => (
+          <TranscriptGroupSection key={group.date} group={group} />
+        ))}
+      </div>
 
-        {/* Pagination */}
-        <div className="flex justify-end py-4">
-          <button
-            className="px-3 py-1.5 text-[15px] font-bold rounded-lg border transition-colors hover:bg-[#f4f8f7]"
-            style={{ color: "#285e50", borderColor: "#285e50" }}
-          >
-            See More
-          </button>
-        </div>
+      {/* See More — never scrolls */}
+      <div className="shrink-0 flex justify-end px-10 py-4 bg-white border-t border-[#e5e5e5]">
+        <button
+          className="px-3 py-1.5 text-[15px] font-bold rounded-lg border transition-colors hover:bg-[#f4f8f7]"
+          style={{ color: "#285e50", borderColor: "#285e50" }}
+        >
+          See More
+        </button>
       </div>
     </div>
   );

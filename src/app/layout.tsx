@@ -29,7 +29,20 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${lato.variable} ${mollieGlaston.variable}`} suppressHydrationWarning>
       <body className="font-[family-name:var(--font-lato)] bg-white" suppressHydrationWarning>
-        {children}
+        {/* Desktop-only gate */}
+        <div className="hidden md:block">{children}</div>
+        <div className="flex md:hidden h-screen flex-col items-center justify-center gap-4 px-8 text-center bg-white">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#285e50" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2" y="3" width="20" height="14" rx="2" />
+            <path d="M8 21h8M12 17v4" />
+          </svg>
+          <p className="text-[20px] text-[#09090b]" style={{ fontFamily: "var(--font-display)", fontWeight: 400 }}>
+            Desktop only
+          </p>
+          <p className="text-[14px] text-[#747474] leading-[1.6] max-w-[260px]">
+            This prototype is designed for desktop. Please open it on a larger screen.
+          </p>
+        </div>
       </body>
     </html>
   );
