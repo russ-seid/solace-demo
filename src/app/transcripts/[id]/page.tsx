@@ -419,7 +419,7 @@ export default function TranscriptDetailPage() {
         </div>
 
         {/* ── Right column — Tasks ── */}
-        <div className="w-[320px] shrink-0 self-start border border-[#e5e5e5] rounded-xl overflow-hidden">
+        <div className="w-[320px] shrink-0 flex flex-col border border-[#e5e5e5] rounded-xl overflow-hidden">
 
           {/* Tasks header */}
           <div className="px-6 py-4 border-b border-[#e5e5e5]">
@@ -457,7 +457,7 @@ export default function TranscriptDetailPage() {
           </div>
 
           {/* Task list */}
-          <div className="px-5">
+          <div className="px-5 overflow-y-auto flex-1 min-h-0">
             {totalTasks === 0 ? (
               <div className="flex flex-col items-center justify-center py-10 gap-2 text-center">
                 <ChecklistOutlinedIcon sx={{ fontSize: 28, color: "#ccc" }} />
@@ -505,8 +505,12 @@ export default function TranscriptDetailPage() {
               </div>
             )}
             {/* Add task */}
+          </div>
+
+          {/* Add task — always visible at bottom */}
+          <div className="px-5 py-4 border-t border-[#f0f0f0] shrink-0">
             <button
-              className="w-full mt-4 mb-5 py-2.5 rounded-lg text-[13px] font-semibold text-[#285e50] transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+              className="w-full py-2.5 rounded-lg text-[13px] font-semibold text-[#285e50] transition-colors cursor-pointer flex items-center justify-center gap-1.5"
               style={{ border: "1.5px dashed #b6d4cc" }}
               onMouseEnter={e => { (e.currentTarget as HTMLElement).style.backgroundColor = "#f4f8f7"; (e.currentTarget as HTMLElement).style.borderColor = "#285e50"; }}
               onMouseLeave={e => { (e.currentTarget as HTMLElement).style.backgroundColor = "transparent"; (e.currentTarget as HTMLElement).style.borderColor = "#b6d4cc"; }}
