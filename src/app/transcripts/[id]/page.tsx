@@ -458,8 +458,12 @@ export default function TranscriptDetailPage() {
                 <p className="text-[12px] text-[#747474] leading-[1.5]">No action required for this call.</p>
               </div>
             ) : hasVisibleTasks ? (
-              data.suggestedActions.map((action, i) => {
+              (() => {
+                let visibleNumber = 0;
+                return data.suggestedActions.map((action, i) => {
                 if (dismissed.has(i)) return null;
+                visibleNumber += 1;
+                const displayNumber = visibleNumber;
                 const state = getTaskState(i);
                 return (
                   <div
@@ -475,7 +479,7 @@ export default function TranscriptDetailPage() {
                   >
                     <SuggestedAction
                       text={action}
-                      taskNumber={i + 1}
+                      taskNumber={displayNumber}
                       taskState={state}
                       isSelected={selectedTask === i}
                       isHighlightedFromTranscript={hoveredTaskIdx === i}
@@ -489,7 +493,8 @@ export default function TranscriptDetailPage() {
                     />
                   </div>
                 );
-              })
+              });
+              })()
             ) : (
               <div className="flex flex-col items-center justify-center py-10 gap-2 text-center">
                 <ChecklistOutlinedIcon sx={{ fontSize: 28, color: "#ccc" }} />
