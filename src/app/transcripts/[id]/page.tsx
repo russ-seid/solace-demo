@@ -239,6 +239,13 @@ export default function TranscriptDetailPage() {
 
   const hasVisibleTasks = totalTasks - dismissed.size > 0;
 
+  // Map original task index → sequential display number (skipping dismissed)
+  const taskDisplayNumber: Record<number, number> = {};
+  let displayNum = 0;
+  data.suggestedActions.forEach((_, i) => {
+    if (!dismissed.has(i)) taskDisplayNumber[i] = ++displayNum;
+  });
+
   const filteredTranscript = searchQuery
     ? data.transcript.filter(
         (m) =>
@@ -385,8 +392,8 @@ export default function TranscriptDetailPage() {
                     onMouseLeave={() => setHoveredTaskIdx(null)}
                   >
                     <div className="w-5 shrink-0 flex flex-col gap-1 pt-1">
-                      {taskBadges.map((taskIdx) => (
-                        <TaskBadge key={taskIdx} number={taskIdx + 1} />
+                      {taskBadges.filter((taskIdx) => !dismissed.has(taskIdx)).map((taskIdx) => (
+                        <TaskBadge key={taskIdx} number={taskDisplayNumber[taskIdx]} />
                       ))}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -458,12 +465,8 @@ export default function TranscriptDetailPage() {
                 <p className="text-[12px] text-[#747474] leading-[1.5]">No action required for this call.</p>
               </div>
             ) : hasVisibleTasks ? (
-              (() => {
-                let visibleNumber = 0;
-                return data.suggestedActions.map((action, i) => {
+              data.suggestedActions.map((action, i) => {
                 if (dismissed.has(i)) return null;
-                visibleNumber += 1;
-                const displayNumber = visibleNumber;
                 const state = getTaskState(i);
                 return (
                   <div
@@ -479,7 +482,7 @@ export default function TranscriptDetailPage() {
                   >
                     <SuggestedAction
                       text={action}
-                      taskNumber={displayNumber}
+                      taskNumber={taskDisplayNumber[i]}
                       taskState={state}
                       isSelected={selectedTask === i}
                       isHighlightedFromTranscript={hoveredTaskIdx === i}
@@ -493,8 +496,7 @@ export default function TranscriptDetailPage() {
                     />
                   </div>
                 );
-              });
-              })()
+              })
             ) : (
               <div className="flex flex-col items-center justify-center py-10 gap-2 text-center">
                 <ChecklistOutlinedIcon sx={{ fontSize: 28, color: "#ccc" }} />
