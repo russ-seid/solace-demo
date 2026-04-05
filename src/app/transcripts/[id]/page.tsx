@@ -155,6 +155,7 @@ export default function TranscriptDetailPage() {
   const [hoveredTaskIdx, setHoveredTaskIdx] = useState<number | null>(null);
   const messageRefs = useRef<(HTMLDivElement | null)[]>([]);
   const taskRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
 
   const [approved, setApproved] = useState<Set<number>>(new Set(data?.initialApproved ?? []));
   const [completed, setCompleted] = useState<Set<number>>(new Set(data?.initialCompleted ?? []));
@@ -204,18 +205,35 @@ export default function TranscriptDetailPage() {
     return "pending";
   }
 
+  function scrollMessageIntoView(msgIndex: number, block: "center" | "nearest" = "center") {
+    const container = messagesContainerRef.current;
+    const el = messageRefs.current[msgIndex];
+    if (!container || !el) return;
+    const containerTop = container.scrollTop;
+    const containerBottom = containerTop + container.clientHeight;
+    const elTop = el.offsetTop;
+    const elBottom = elTop + el.offsetHeight;
+    if (block === "center") {
+      container.scrollTo({ top: elTop - container.clientHeight / 2 + el.offsetHeight / 2, behavior: "smooth" });
+    } else if (elTop < containerTop) {
+      container.scrollTo({ top: elTop - 16, behavior: "smooth" });
+    } else if (elBottom > containerBottom) {
+      container.scrollTo({ top: elBottom - container.clientHeight + 16, behavior: "smooth" });
+    }
+  }
+
   function handleInsightClick(i: number) {
     const next = selectedInsight === i ? null : i;
     setSelectedInsight(next);
     if (next !== null && data.insightToMessage[next] !== undefined) {
-      messageRefs.current[data.insightToMessage[next]]?.scrollIntoView({ behavior: "smooth", block: "center" });
+      scrollMessageIntoView(data.insightToMessage[next], "center");
     }
   }
 
   function handleTranscriptRowHover(taskBadges: number[]) {
     if (taskBadges.length > 0) {
       setHoveredTaskIdx(taskBadges[0]);
-      taskRefs.current[taskBadges[0]]?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      scrollMessageIntoView(data.taskToMessage[taskBadges[0]], "nearest");
     }
   }
 
@@ -345,7 +363,7 @@ export default function TranscriptDetailPage() {
             </div>
 
             {/* Messages */}
-            <div className="px-6 py-4 flex flex-col gap-5 flex-1 overflow-y-auto min-h-0">
+            <div ref={messagesContainerRef} className="px-6 py-4 flex flex-col gap-5 flex-1 overflow-y-auto min-h-0">
               {filteredTranscript.map((msg, i) => {
                 const originalIndex = data.transcript.indexOf(msg);
                 const isInsightHighlighted = selectedInsight !== null && data.insightToMessage[selectedInsight] === originalIndex;
@@ -450,7 +468,7 @@ export default function TranscriptDetailPage() {
                     onMouseEnter={() => {
                       setSelectedTask(i);
                       if (data.taskToMessage[i] !== undefined) {
-                        messageRefs.current[data.taskToMessage[i]]?.scrollIntoView({ behavior: "smooth", block: "center" });
+                        scrollMessageIntoView(data.taskToMessage[i], "center");
                       }
                     }}
                     onMouseLeave={() => setSelectedTask(null)}
