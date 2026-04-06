@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Lato } from "next/font/google";
 import localFont from "next/font/local";
 import "./globals.css";
+import ClientProviders from "@/components/ClientProviders";
 
 const lato = Lato({
   subsets: ["latin"],
@@ -30,7 +31,9 @@ export default function RootLayout({
     <html lang="en" className={`${lato.variable} ${mollieGlaston.variable}`} suppressHydrationWarning>
       <body className="font-[family-name:var(--font-lato)] bg-white" suppressHydrationWarning>
         {/* Desktop-only gate */}
-        <div className="hidden md:block">{children}</div>
+        <ClientProviders>
+          <div className="hidden md:block">{children}</div>
+        </ClientProviders>
         <div className="flex md:hidden h-screen flex-col items-center justify-center gap-4 px-8 text-center bg-white">
           <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#285e50" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <rect x="2" y="3" width="20" height="14" rx="2" />

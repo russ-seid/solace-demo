@@ -4,6 +4,9 @@ import Link from "next/link";
 import { getSavedState, computeStatus } from "./transcriptStore";
 import { transcriptDataMap } from "./transcriptData";
 import TopNavShared from "@/components/TopNav";
+import AnnotationHud from "@/components/AnnotationHud";
+import AnnotationPin from "@/components/AnnotationPin";
+import { useAnnotations } from "@/contexts/AnnotationContext";
 import PhoneIcon from "@mui/icons-material/LocalPhoneOutlined";
 import VideoIcon from "@mui/icons-material/VideocamOutlined";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
@@ -131,8 +134,27 @@ function StatusPill({ status }: { status: Status }) {
   );
 }
 
+const LIST_ANNOTATIONS = [
+  {
+    number: 1,
+    label: "AI-generated title & subtitle",
+    text: "AI generates a call title and one-line summary for every transcript, giving advocates immediate context without opening the transcript.",
+  },
+  {
+    number: 2,
+    label: "Status badge system",
+    text: "Three mutually exclusive states communicate the advocate's workload at a glance: Unreviewed (unseen transcripts with pending AI suggestions), In Progress (approved tasks actively being worked), Reviewed (no pending actions).",
+  },
+  {
+    number: 3,
+    label: "Task count sub-label",
+    text: "Secondary label reinforces the status badge with specific task context, distinguishing between complex and routine calls.",
+  },
+];
+
 // TranscriptRow component
-function TranscriptRow({ transcript }: { transcript: Transcript }) {
+function TranscriptRow({ transcript, showAnnotations }: { transcript: Transcript; showAnnotations?: boolean }) {
+  const { status, taskLabel } = getLiveStatus(transcript.id);
   return (
     <Link href={`/transcripts/${transcript.id}`} className="flex items-center border-b border-[#dbdbdb] last:border-b-0 bg-white hover:bg-[#fafafa] transition-colors cursor-pointer group">
       {/* Time */}
@@ -163,9 +185,14 @@ function TranscriptRow({ transcript }: { transcript: Transcript }) {
 
       {/* Summary */}
       <div className="flex-1 min-w-0 px-4 py-6">
-        <p className="text-[15px] font-bold text-[#09090b] leading-[1.4] truncate mb-1">
-          {transcript.summaryTitle}
-        </p>
+        <div className="flex items-start gap-1.5 mb-1">
+          <p className="text-[15px] font-bold text-[#09090b] leading-[1.4] truncate min-w-0">
+            {transcript.summaryTitle}
+          </p>
+          {showAnnotations && (
+            <AnnotationPin number={1} text={LIST_ANNOTATIONS[0].text}/>
+          )}
+        </div>
         <p className="text-[13px] font-normal text-[#747474] leading-[1.5] truncate">
           {transcript.summaryNote}
         </p>
@@ -173,10 +200,20 @@ function TranscriptRow({ transcript }: { transcript: Transcript }) {
 
       {/* Status */}
       <div className="w-[200px] shrink-0 px-6 py-6 flex flex-col gap-1">
-        <StatusPill status={getLiveStatus(transcript.id).status} />
-        <span className="text-[13px] font-normal text-[#747474] leading-[1.5] whitespace-nowrap">
-          {getLiveStatus(transcript.id).taskLabel}
-        </span>
+        <div className="flex items-center gap-1.5">
+          <StatusPill status={status} />
+          {showAnnotations && (
+            <AnnotationPin number={2} text={LIST_ANNOTATIONS[1].text}/>
+          )}
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[13px] font-normal text-[#747474] leading-[1.5] whitespace-nowrap">
+            {taskLabel}
+          </span>
+          {showAnnotations && (
+            <AnnotationPin number={3} text={LIST_ANNOTATIONS[2].text}/>
+          )}
+        </div>
       </div>
 
       {/* Arrow */}
@@ -188,7 +225,8 @@ function TranscriptRow({ transcript }: { transcript: Transcript }) {
 }
 
 // TranscriptGroup component
-function TranscriptGroupSection({ group }: { group: TranscriptGroup }) {
+function TranscriptGroupSection({ group, annotateFirstRow }: { group: TranscriptGroup; annotateFirstRow?: boolean }) {
+  const { enabled } = useAnnotations();
   return (
     <div className="flex gap-8 border-b border-[#dbdbdb]">
       {/* Date label */}
@@ -200,8 +238,12 @@ function TranscriptGroupSection({ group }: { group: TranscriptGroup }) {
 
       {/* Rows */}
       <div className="flex-1 min-w-0">
-        {group.transcripts.map((transcript) => (
-          <TranscriptRow key={transcript.id} transcript={transcript} />
+        {group.transcripts.map((transcript, idx) => (
+          <TranscriptRow
+            key={transcript.id}
+            transcript={transcript}
+            showAnnotations={enabled && annotateFirstRow && idx === 0}
+          />
         ))}
       </div>
     </div>
@@ -255,14 +297,17 @@ function PageHeader() {
 function getLiveStatus(id: string): { status: Status; taskLabel: string } {
   const saved = getSavedState(id);
   const data = transcriptDataMap[id];
-  if (!saved || !data) return { status: data ? (data.suggestedActions.length === 0 ? "reviewed" : "unreviewed") : "unreviewed", taskLabel: transcriptGroups.flatMap(g => g.transcripts).find(t => t.id === id)?.taskLabel ?? "" };
+  if (!data) return { status: "unreviewed", taskLabel: "" };
+  const approved = saved?.approved ?? data.initialApproved;
+  const completed = saved?.completed ?? data.initialCompleted;
+  const dismissed = saved?.dismissed ?? data.initialDismissed;
   const totalTasks = data.suggestedActions.length;
-  const status = computeStatus(totalTasks, saved.approved, saved.completed, saved.dismissed);
-  const pendingCount = totalTasks - saved.approved.length - saved.completed.length - saved.dismissed.length;
+  const status = computeStatus(totalTasks, approved, completed, dismissed);
+  const pendingCount = totalTasks - approved.length - completed.length - dismissed.length;
   const parts = [
     pendingCount > 0 ? `${pendingCount} suggested` : null,
-    saved.approved.length > 0 ? `${saved.approved.length} in progress` : null,
-    saved.completed.length > 0 ? `${saved.completed.length} completed` : null,
+    approved.length > 0 ? `${approved.length} in progress` : null,
+    completed.length > 0 ? `${completed.length} completed` : null,
   ].filter(Boolean);
   const taskLabel = parts.length > 0 ? parts.join(" · ") : "0 tasks";
   return { status, taskLabel };
@@ -283,8 +328,8 @@ export default function TranscriptsPage() {
 
       {/* Scrollable list */}
       <div className="flex-1 overflow-y-auto px-10 min-h-0">
-        {transcriptGroups.map((group) => (
-          <TranscriptGroupSection key={group.date} group={group} />
+        {transcriptGroups.map((group, groupIdx) => (
+          <TranscriptGroupSection key={group.date} group={group} annotateFirstRow={groupIdx === 0} />
         ))}
       </div>
 
@@ -297,6 +342,8 @@ export default function TranscriptsPage() {
           See More
         </button>
       </div>
+
+      <AnnotationHud annotations={LIST_ANNOTATIONS.map(({ number, label }) => ({ number, label }))} />
     </div>
   );
 }

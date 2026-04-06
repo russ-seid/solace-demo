@@ -16,6 +16,49 @@ import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
 import ChecklistOutlinedIcon from "@mui/icons-material/ChecklistOutlined";
 import { transcriptDataMap } from "../transcriptData";
 import { getSavedState, saveState } from "../transcriptStore";
+import AnnotationHud from "@/components/AnnotationHud";
+import AnnotationPin from "@/components/AnnotationPin";
+import { useAnnotations } from "@/contexts/AnnotationContext";
+
+// ─── Annotations ──────────────────────────────────────────────────────────────
+
+const DETAIL_ANNOTATIONS = [
+  {
+    number: 1,
+    label: "AI summary card",
+    text: "AI-generated summary surfaces the call title, narrative summary, and key insight chips. Labeled 'AI-generated' to set clear expectations and encourage verification against the full transcript.",
+  },
+  {
+    number: 2,
+    label: "Key insight chips",
+    text: "Clicking any insight chip scrolls the transcript and highlights the exact passage it was derived from, grounding AI outputs in the real conversation.",
+  },
+  {
+    number: 3,
+    label: "Numbered transcript markers",
+    text: "Each AI-suggested task is numbered and a matching marker appears inline in the transcript at the moment that generated it, creating a permanent, passive connection between action and source.",
+  },
+  {
+    number: 4,
+    label: "Approve / Dismiss",
+    text: "Advocates consciously approve or dismiss each AI suggestion before tasks enter the platform workflow, keeping humans in control of AI outputs.",
+  },
+  {
+    number: 5,
+    label: "+ Add a task manually",
+    text: "For advocates who identify action items the AI missed, ensuring the system supports all working styles.",
+  },
+  {
+    number: 6,
+    label: "Tasks counter",
+    text: "Updates in real time as tasks are approved, giving advocates a clear sense of completion progress.",
+  },
+  {
+    number: 7,
+    label: "View task button",
+    text: "Links directly into the existing platform task flow, keeping the experience grounded in tools advocates already know.",
+  },
+];
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -66,6 +109,8 @@ function SuggestedAction({
   onApprove,
   onComplete,
   onViewTask,
+  showApproveAnnotation,
+  showViewTaskAnnotation,
 }: {
   text: string;
   taskNumber: number;
@@ -76,6 +121,8 @@ function SuggestedAction({
   onApprove: () => void;
   onComplete: () => void;
   onViewTask: () => void;
+  showApproveAnnotation?: boolean;
+  showViewTaskAnnotation?: boolean;
 }) {
   const highlight = isHighlightedFromTranscript || isSelected;
 
@@ -117,20 +164,28 @@ function SuggestedAction({
           >
             Dismiss
           </button>
+          {showApproveAnnotation && (
+            <AnnotationPin number={4} text={DETAIL_ANNOTATIONS[3].text} />
+          )}
         </div>
       )}
 
       {taskState === "inprogress" && (
         <div className="flex items-center justify-between mt-3 pl-8">
           <TaskStatusPill state="inprogress" />
-          <button
-            onClick={onViewTask}
-            className="flex items-center gap-1 px-3 py-1 rounded-md text-[12px] font-bold border transition-colors cursor-pointer"
-            style={{ borderColor: "#285e50", color: "#285e50", backgroundColor: "transparent" }}
-          >
-            View task
-            <ChevronRightIcon sx={{ fontSize: 14 }} />
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={onViewTask}
+              className="flex items-center gap-1 px-3 py-1 rounded-md text-[12px] font-bold border transition-colors cursor-pointer"
+              style={{ borderColor: "#285e50", color: "#285e50", backgroundColor: "transparent" }}
+            >
+              View task
+              <ChevronRightIcon sx={{ fontSize: 14 }} />
+            </button>
+            {showViewTaskAnnotation && (
+              <AnnotationPin number={7} text={DETAIL_ANNOTATIONS[6].text} />
+            )}
+          </div>
         </div>
       )}
 
@@ -157,6 +212,9 @@ export default function TranscriptDetailPage() {
   const messageRefs = useRef<(HTMLDivElement | null)[]>([]);
   const taskRefs = useRef<(HTMLDivElement | null)[]>([]);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const userScrollingRef = useRef(false);
+  const programmaticScrollRef = useRef(false);
+  const scrollGuardTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const saved = getSavedState(id);
   const [approved, setApproved] = useState<Set<number>>(new Set(saved?.approved ?? data?.initialApproved ?? []));
@@ -165,6 +223,7 @@ export default function TranscriptDetailPage() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [toast, setToast] = useState(false);
+  const { enabled: showAnnotations } = useAnnotations();
 
   useEffect(() => {
     saveState(id, { approved: [...approved], completed: [...completed], dismissed: [...dismissed] });
@@ -189,6 +248,9 @@ export default function TranscriptDetailPage() {
     if (!messageToTasks[msgIdx]) messageToTasks[msgIdx] = [];
     messageToTasks[msgIdx].push(Number(taskIdx));
   });
+  const firstBadgedMsgIdx = data.transcript.findIndex((_, idx) =>
+    (messageToTasks[idx] ?? []).filter((t) => !dismissed.has(t)).length > 0
+  );
 
   const totalTasks = data.suggestedActions.length;
   const pendingCount = totalTasks - approved.size - completed.size - dismissed.size;
@@ -211,21 +273,36 @@ export default function TranscriptDetailPage() {
     return "pending";
   }
 
-  function scrollMessageIntoView(msgIndex: number, block: "center" | "nearest" = "center") {
+  const firstPendingIdx = data.suggestedActions.findIndex((_, i) => !dismissed.has(i) && getTaskState(i) === "pending");
+  const firstInProgressIdx = data.suggestedActions.findIndex((_, i) => !dismissed.has(i) && getTaskState(i) === "inprogress");
+
+  function scrollMessageIntoView(msgIndex: number, block: "center" | "nearest" = "center", respectUserScroll = false) {
+    if (respectUserScroll && userScrollingRef.current) return;
     const container = messagesContainerRef.current;
     const el = messageRefs.current[msgIndex];
     if (!container || !el) return;
-    const containerTop = container.scrollTop;
-    const containerBottom = containerTop + container.clientHeight;
-    const elTop = el.offsetTop;
-    const elBottom = elTop + el.offsetHeight;
+    const containerRect = container.getBoundingClientRect();
+    const elRect = el.getBoundingClientRect();
+    const elScrollTop = container.scrollTop + (elRect.top - containerRect.top);
+    programmaticScrollRef.current = true;
+    setTimeout(() => { programmaticScrollRef.current = false; }, 600);
+
     if (block === "center") {
-      container.scrollTo({ top: elTop - container.clientHeight / 2 + el.offsetHeight / 2, behavior: "smooth" });
-    } else if (elTop < containerTop) {
-      container.scrollTo({ top: elTop - 16, behavior: "smooth" });
-    } else if (elBottom > containerBottom) {
-      container.scrollTo({ top: elBottom - container.clientHeight + 16, behavior: "smooth" });
+      container.scrollTo({ top: elScrollTop - container.clientHeight / 2 + elRect.height / 2, behavior: "smooth" });
+    } else {
+      if (elRect.top < containerRect.top) {
+        container.scrollTo({ top: elScrollTop - 16, behavior: "smooth" });
+      } else if (elRect.bottom > containerRect.bottom) {
+        container.scrollTo({ top: elScrollTop - container.clientHeight + elRect.height + 16, behavior: "smooth" });
+      }
     }
+  }
+
+  function handleUserScroll() {
+    if (programmaticScrollRef.current) return;
+    userScrollingRef.current = true;
+    if (scrollGuardTimer.current) clearTimeout(scrollGuardTimer.current);
+    scrollGuardTimer.current = setTimeout(() => { userScrollingRef.current = false; }, 1000);
   }
 
   function handleInsightClick(i: number) {
@@ -239,7 +316,7 @@ export default function TranscriptDetailPage() {
   function handleTranscriptRowHover(taskBadges: number[]) {
     if (taskBadges.length > 0) {
       setHoveredTaskIdx(taskBadges[0]);
-      scrollMessageIntoView(data.taskToMessage[taskBadges[0]], "nearest");
+      scrollMessageIntoView(data.taskToMessage[taskBadges[0]], "nearest", true);
     }
   }
 
@@ -316,6 +393,7 @@ export default function TranscriptDetailPage() {
                   <div className="flex items-center gap-1.5">
                     <AutoAwesomeOutlinedIcon sx={{ fontSize: 13, color: "#285e50" }} />
                     <span className="text-[11px] font-bold text-[#285e50] uppercase tracking-widest">AI Summary</span>
+                    {showAnnotations && <AnnotationPin number={1} text={DETAIL_ANNOTATIONS[0].text} />}
                   </div>
                   {totalTasks > 0 && (
                     <span className="text-[12px] text-[#747474]">AI-generated · Review the tasks on the right.</span>
@@ -332,7 +410,7 @@ export default function TranscriptDetailPage() {
                 </p>
                 {/* Key Insights */}
                 {data.keyInsights.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-2 items-center">
                     {data.keyInsights.map((insight, i) => (
                       <button
                         key={i}
@@ -350,6 +428,7 @@ export default function TranscriptDetailPage() {
                         {insight}
                       </button>
                     ))}
+                    {showAnnotations && <AnnotationPin number={2} text={DETAIL_ANNOTATIONS[1].text} />}
                   </div>
                 )}
               </div>
@@ -376,7 +455,7 @@ export default function TranscriptDetailPage() {
             </div>
 
             {/* Messages */}
-            <div ref={messagesContainerRef} className="px-6 py-4 flex flex-col gap-5 flex-1 overflow-y-auto min-h-0">
+            <div ref={messagesContainerRef} onScroll={handleUserScroll} className="px-6 py-4 flex flex-col gap-5 flex-1 overflow-y-auto min-h-0">
               {filteredTranscript.map((msg, i) => {
                 const originalIndex = data.transcript.indexOf(msg);
                 const isInsightHighlighted = selectedInsight !== null && data.insightToMessage[selectedInsight] === originalIndex;
@@ -414,6 +493,11 @@ export default function TranscriptDetailPage() {
                       </div>
                       <p className="text-[14px] text-[#232323] leading-[1.6]">{msg.text}</p>
                     </div>
+                    {showAnnotations && originalIndex === firstBadgedMsgIdx && (
+                      <div className="shrink-0 self-center">
+                        <AnnotationPin number={3} text={DETAIL_ANNOTATIONS[2].text} />
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -458,6 +542,7 @@ export default function TranscriptDetailPage() {
                 {completed.size > 0 && (
                   <span className="text-[12px] text-[#747474]">{completed.size} completed</span>
                 )}
+                {showAnnotations && <AnnotationPin number={6} text={DETAIL_ANNOTATIONS[5].text} />}
               </div>
             )}
           </div>
@@ -481,7 +566,7 @@ export default function TranscriptDetailPage() {
                     onMouseEnter={() => {
                       setSelectedTask(i);
                       if (data.taskToMessage[i] !== undefined) {
-                        scrollMessageIntoView(data.taskToMessage[i], "center");
+                        scrollMessageIntoView(data.taskToMessage[i], "center", true);
                       }
                     }}
                     onMouseLeave={() => setSelectedTask(null)}
@@ -499,6 +584,8 @@ export default function TranscriptDetailPage() {
                         setApproved((prev) => { const s = new Set(prev); s.delete(i); return s; });
                       }}
                       onViewTask={showToast}
+                      showApproveAnnotation={showAnnotations && i === firstPendingIdx}
+                      showViewTaskAnnotation={showAnnotations && i === firstInProgressIdx}
                     />
                   </div>
                 );
@@ -514,18 +601,26 @@ export default function TranscriptDetailPage() {
           </div>
 
           {/* Add task — always visible at bottom */}
-          <div className="px-5 py-4 border-t border-[#f0f0f0] shrink-0">
+          <div className="px-5 py-4 border-t border-[#f0f0f0] shrink-0 flex items-center gap-2">
             <button
-              className="w-full py-2.5 rounded-lg text-[13px] font-semibold text-[#285e50] transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+              className="flex-1 py-2.5 rounded-lg text-[13px] font-semibold text-[#285e50] transition-colors cursor-pointer flex items-center justify-center gap-1.5"
               style={{ border: "1.5px dashed #b6d4cc" }}
               onMouseEnter={e => { (e.currentTarget as HTMLElement).style.backgroundColor = "#f4f8f7"; (e.currentTarget as HTMLElement).style.borderColor = "#285e50"; }}
               onMouseLeave={e => { (e.currentTarget as HTMLElement).style.backgroundColor = "transparent"; (e.currentTarget as HTMLElement).style.borderColor = "#b6d4cc"; }}
             >
               + Add a task manually
             </button>
+            {showAnnotations && <AnnotationPin number={5} text={DETAIL_ANNOTATIONS[4].text} />}
           </div>
         </div>
       </div>
+
+      <AnnotationHud annotations={DETAIL_ANNOTATIONS.filter(({ number }) => {
+        if (number === 4) return firstPendingIdx !== -1;
+        if (number === 6) return totalTasks > 0 && (pendingCount > 0 || approved.size > 0 || completed.size > 0);
+        if (number === 7) return firstInProgressIdx !== -1;
+        return true;
+      }).map(({ number, label }) => ({ number, label }))} />
 
       {/* Toast */}
       <div
